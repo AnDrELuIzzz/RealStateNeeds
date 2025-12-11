@@ -1,194 +1,231 @@
 package org.example;
 
-import org.example.filter.CompositeFilter;
-import org.example.filter.PriceRangeFilter;
-import org.example.filter.StreetFilter;
+import org.example.csv.*;
+import org.example.export.PropertyExporter;
 import org.example.model.Property;
-import org.example.observer.PriceChangeListener;
-import org.example.observer.PropertyListener;
-import org.example.repository.PropertyRepository;
-import org.example.service.PropertyService;
-import org.example.strategy.AddressSortStrategy;
-import org.example.strategy.PriceSortStrategy;
-import org.example.strategy.SortOrder;
-import org.example.util.PropertyGenerator;
 
+import java.io.IOException;
 import java.util.List;
+import java.util.ArrayList;
+import java.util.Scanner;
 
 /**
- * Aplicação principal do Sistema de Gestão de Propriedades Ipiranga.
+ * Aplicação para gerar propriedades ao redor de um endereço base.
  *
- * Esta classe é o entry point (ponto de entrada) da aplicação.
- * Ela demonstra de forma prática todos os padrões de design implementados:
- * - Observer Pattern (notificações)
- * - Strategy Pattern (ordenação)
- * - Composite Pattern (filtros)
- * - Repository Pattern (acesso a dados)
- * - Service Layer Pattern (lógica de negócio)
+ * Fluxo:
+ * 1. Usuário insere 1 linha no CSV: rua + número + preço + intervalo
+ * 2. Sistema busca ruas próximas
+ * 3. Gera múltiplas residências com números aleatórios
+ * 4. Gera preços (acima/abaixo/ambos)
+ * 5. Exporta resultado em TXT formatado
  *
- * @version 1.0
+ * @version 3.0
  * @author Property Management System
  */
 public class PropertyManagementApplication {
 
-    /**
-     * Método principal (main).
-     *
-     * Fluxo de execução:
-     * 1. Gera 30 propriedades aleatórias
-     * 2. Cria repositório e serviço
-     * 3. Inscreve observador para auditoria
-     * 4. Executa 9 demonstrações de funcionalidades
-     * 5. Exibe resultados no console
-     *
-     * @param args Argumentos da linha de comando (não utilizados)
-     */
     public static void main(String[] args) {
-        // ========== CABEÇALHO ==========
         System.out.println("════════════════════════════════════════════════════════════════");
-        System.out.println("    Sistema de Gestão de Propriedades - Bairro Ipiranga");
+        System.out.println("  Sistema de Geração de Propriedades ao Redor do Endereço Base");
         System.out.println("════════════════════════════════════════════════════════════════\n");
 
-        // ========== PASSO 1: Gerar Dados ==========
-        System.out.println("📊 Gerando 30 propriedades...\n");
-        PropertyGenerator generator = new PropertyGenerator();
-        List<Property> generatedProperties = generator.generate(30);
+        Scanner scanner = new Scanner(System.in);
 
-        // ========== PASSO 2: Criar Repositório e Serviço ==========
-        PropertyRepository repository = new PropertyRepository(generatedProperties);
-        PropertyService service = new PropertyService(repository);
+        try {
+            // 1. Obter arquivo CSV
+            System.out.println("📁 Opções:");
+            System.out.println("1. Importar arquivo CSV");
+            System.out.println("2. Usar exemplo (5 ruas pré-configuradas)");
+            System.out.println("3. Sair\n");
+            System.out.print("Escolha uma opção (1-3): ");
 
-        // ========== PASSO 3: Inscrever Observer ==========
-        System.out.println("📌 Inscrevendo observador de auditoria...\n");
-        PropertyListener auditListener = new PriceChangeListener();
-        service.subscribe(auditListener);
+            int choice = scanner.nextInt();
+            scanner.nextLine();
 
-        // ========== DEMONSTRAÇÃO 1: Todas as Propriedades ==========
-        System.out.println("════════════════════════════════════════════════════════════════");
-        System.out.println("TODAS AS PROPRIEDADES (Total: " + service.getPropertyCount() + ")");
-        System.out.println("════════════════════════════════════════════════════════════════\n");
-        service.getAllProperties().forEach(System.out::println);
+            List<CsvPropertyRecord> csvRecords = null;
 
-        // ========== DEMONSTRAÇÃO 2: Ordenação por Preço (Crescente) ==========
-        System.out.println("\n════════════════════════════════════════════════════════════════");
-        System.out.println("PROPRIEDADES ORDENADAS POR PREÇO (Crescente)");
-        System.out.println("════════════════════════════════════════════════════════════════\n");
-        List<Property> sortedByPrice = service.sortProperties(
-                new PriceSortStrategy(SortOrder.ASCENDING)
-        );
-        sortedByPrice.stream().limit(5).forEach(System.out::println);
-        System.out.println("...");
-        System.out.println("[Exibindo 5 de " + sortedByPrice.size() + " propriedades]\n");
+            switch (choice) {
+                case 1 -> {
+                    // Importar CSV
+                    System.out.print("\nCaminho do arquivo CSV: ");
+                    String filePath = scanner.nextLine();
 
-        // ========== DEMONSTRAÇÃO 3: Ordenação por Endereço (Decrescente) ==========
-        System.out.println("════════════════════════════════════════════════════════════════");
-        System.out.println("PROPRIEDADES ORDENADAS POR ENDEREÇO (Descendente)");
-        System.out.println("════════════════════════════════════════════════════════════════\n");
-        List<Property> sortedByAddress = service.sortProperties(
-                new AddressSortStrategy(SortOrder.DESCENDING)
-        );
-        sortedByAddress.stream().limit(5).forEach(System.out::println);
-        System.out.println("...");
-        System.out.println("[Exibindo 5 de " + sortedByAddress.size() + " propriedades]\n");
+                    try {
+                        CsvPropertyReader reader = new CsvPropertyReader();
+                        csvRecords = reader.read(filePath);
 
-        // ========== DEMONSTRAÇÃO 4: Filtro por Faixa de Preço ==========
-        System.out.println("════════════════════════════════════════════════════════════════");
-        System.out.println("PROPRIEDADES FILTRADAS - Preço entre R$ 9.000,00 e R$ 9.999,99");
-        System.out.println("════════════════════════════════════════════════════════════════\n");
-        List<Property> filteredByPrice = service.filterProperties(
-                new PriceRangeFilter(9000, 9999.99)
-        );
-        filteredByPrice.forEach(System.out::println);
-        System.out.println("\nTotal encontrado: " + filteredByPrice.size() + "\n");
+                        if (csvRecords.isEmpty()) {
+                            System.out.println("❌ Arquivo vazio!");
+                            return;
+                        }
 
-        // ========== DEMONSTRAÇÃO 5: Filtro por Rua ==========
-        System.out.println("════════════════════════════════════════════════════════════════");
-        System.out.println("PROPRIEDADES - Rua Vicente da Costa");
-        System.out.println("════════════════════════════════════════════════════════════════\n");
-        List<Property> filteredByStreet = service.filterProperties(
-                new StreetFilter("Rua Vicente da Costa")
-        );
-        filteredByStreet.forEach(System.out::println);
-        System.out.println("\nTotal encontrado: " + filteredByStreet.size() + "\n");
+                        System.out.println("\n✓ Registros carregados com sucesso!");
+                        exibirRegistros(csvRecords);
 
-        // ========== DEMONSTRAÇÃO 6: Filtro Composto (AND) ==========
-        System.out.println("════════════════════════════════════════════════════════════════");
-        System.out.println("FILTRO COMPOSTO (AND) - Rua Vicente da Costa E Preço 8.500-10.000");
-        System.out.println("════════════════════════════════════════════════════════════════\n");
-        List<Property> compositeFilterAnd = service.filterProperties(
-                new CompositeFilter(
-                        CompositeFilter.Operator.AND,
-                        new StreetFilter("Rua Vicente da Costa"),
-                        new PriceRangeFilter(8500, 10000)
-                )
-        );
-        compositeFilterAnd.forEach(System.out::println);
-        System.out.println("\nTotal encontrado: " + compositeFilterAnd.size() + "\n");
+                    } catch (IOException e) {
+                        System.err.println("❌ Erro ao ler arquivo: " + e.getMessage());
+                        return;
+                    }
+                }
+                case 2 -> {
+                    // Exemplo
+                    csvRecords = criarExemploRegistros();
 
-        // ========== DEMONSTRAÇÃO 7: Observer Pattern em Ação ==========
-        if (!filteredByPrice.isEmpty()) {
-            System.out.println("════════════════════════════════════════════════════════════════");
-            System.out.println("DEMONSTRAÇÃO - Observer Pattern (Mudança de Preço)");
-            System.out.println("════════════════════════════════════════════════════════════════\n");
+                    System.out.println("\n✓ Exemplo carregado com 5 ruas!");
+                    exibirRegistros(csvRecords);
+                }
+                case 3 -> {
+                    System.out.println("Saindo...");
+                    return;
+                }
+                default -> {
+                    System.out.println("Opção inválida!");
+                    return;
+                }
+            }
 
-            Property propertyToUpdate = filteredByPrice.get(0);
-            System.out.println("Atualizando preço de: " + propertyToUpdate.getAddress());
-            System.out.println("Preço anterior: R$ " + String.format("%.2f", propertyToUpdate.getPrice().doubleValue()));
+            if (csvRecords == null || csvRecords.isEmpty()) {
+                System.out.println("Nenhum registro carregado!");
+                return;
+            }
 
-            // Isto irá disparar notificação para o listener (PriceChangeListener)
-            service.updatePropertyPrice(propertyToUpdate, 10500.00);
+            // 2. Perguntar quantidade de propriedades
+            System.out.print("\n📊 Quantas propriedades gerar POR RUA? (padrão: 5): ");
+            int quantityPerStreet = 5;
+            if (scanner.hasNextInt()) {
+                quantityPerStreet = scanner.nextInt();
+                scanner.nextLine();
+            } else {
+                scanner.nextLine();
+            }
 
-            System.out.println("\n");
+            if (quantityPerStreet < 1) quantityPerStreet = 5;
+
+            // 3. Perguntar quantidade de ruas próximas
+            System.out.print("🗺️  Quantas ruas próximas gerar? (padrão: 3): ");
+            int nearbyStreetsCount = 3;
+            if (scanner.hasNextInt()) {
+                nearbyStreetsCount = scanner.nextInt();
+                scanner.nextLine();
+            } else {
+                scanner.nextLine();
+            }
+
+            if (nearbyStreetsCount < 1) nearbyStreetsCount = 3;
+
+            // 4. Gerar propriedades para TODOS os registros
+            System.out.println("\n⏳ Gerando propriedades para " + csvRecords.size() + " rua(s)...\n");
+
+            NeighborhoodPropertyGenerator generator = new NeighborhoodPropertyGenerator();
+            List<Property> allProperties = new ArrayList<>();
+
+            int recordNumber = 1;
+            for (CsvPropertyRecord csvRecord : csvRecords) {
+                System.out.println("Processando registro " + recordNumber + "/" + csvRecords.size() + ":");
+
+                List<Property> properties = generator.generateNeighborhoodProperties(
+                        csvRecord,
+                        quantityPerStreet,
+                        nearbyStreetsCount
+                );
+                allProperties.addAll(properties);
+                recordNumber++;
+            }
+
+            // 5. Exportar para TXT
+            String filename = "imoveis_" + System.currentTimeMillis() + ".txt";
+            System.out.println("\n💾 Exportando para arquivo: " + filename);
+
+            PropertyExporter exporter = new PropertyExporter();
+            String fullPath = exporter.exportToTxt(
+                    allProperties,
+                    filename,
+                    "Relatório Geral - " + csvRecords.size() + " rua(s) processada(s)"
+            );
+
+            System.out.println("✅ Arquivo criado com sucesso!");
+            System.out.println("   Caminho: " + fullPath);
+            System.out.println("   Total de imóveis: " + allProperties.size());
+
+            // 6. Perguntar se quer exibir
+            System.out.print("\n👀 Exibir arquivo no terminal? (s/n): ");
+            String displayChoice = scanner.nextLine();
+
+            if (displayChoice.equalsIgnoreCase("s")) {
+                System.out.println("\n");
+                exporter.displayInTerminal(filename);
+            }
+
+        } catch (Exception e) {
+            System.err.println("❌ Erro: " + e.getMessage());
+            e.printStackTrace();
+        } finally {
+            scanner.close();
+        }
+    }
+
+    /**
+     * Exibe os registros carregados do CSV.
+     */
+    private static void exibirRegistros(List<CsvPropertyRecord> records) {
+        System.out.println("\n📋 Registros carregados:");
+        int count = 1;
+        for (CsvPropertyRecord record : records) {
+            System.out.println(count + ". " + record.getStreet() +
+                    ", nº " + record.getNumber() +
+                    ", R$ " + String.format("%.2f", record.getPrice().doubleValue()) +
+                    ", " + record.getPriceRange());
+            count++;
+        }
+    }
+
+    /**
+     * Cria registros de exemplo.
+     */
+    private static List<CsvPropertyRecord> criarExemploRegistros() {
+        List<CsvPropertyRecord> records = new ArrayList<>();
+
+        records.add(CsvPropertyRecord.builder()
+                .street("Rua Vicente da Costa")
+                .number(150)
+                .price(new java.math.BigDecimal("9999.99"))
+                .priceRange("ambos")
+                .build());
+
+        records.add(CsvPropertyRecord.builder()
+                .street("Rua Moreira e Costa")
+                .number(200)
+                .price(new java.math.BigDecimal("8500.50"))
+                .priceRange("acima")
+                .build());
+
+        records.add(CsvPropertyRecord.builder()
+                .street("Rua Xavier de Almeida")
+                .number(300)
+                .price(new java.math.BigDecimal("10500.00"))
+                .priceRange("abaixo")
+                .build());
+
+        records.add(CsvPropertyRecord.builder()
+                .street("Rua Rodrigues do Prado")
+                .number(400)
+                .price(new java.math.BigDecimal("11000.00"))
+                .priceRange("ambos")
+                .build());
+
+        records.add(CsvPropertyRecord.builder()
+                .street("Rua Clóvis Bueno de Azevedo")
+                .number(500)
+                .price(new java.math.BigDecimal("8750.25"))
+                .priceRange("acima")
+                .build());
+
+        // Formatar endereços completos
+        for (CsvPropertyRecord record : records) {
+            record.formatFullAddress("Ipiranga");
         }
 
-        // ========== DEMONSTRAÇÃO 8: Filtro Composto (OR) ==========
-        System.out.println("════════════════════════════════════════════════════════════════");
-        System.out.println("FILTRO COMPOSTO (OR) - Rua Vicente da Costa OU Rua Bom Pastor");
-        System.out.println("════════════════════════════════════════════════════════════════\n");
-        List<Property> compositeFilterOr = service.filterProperties(
-                new CompositeFilter(
-                        CompositeFilter.Operator.OR,
-                        new StreetFilter("Rua Vicente da Costa"),
-                        new StreetFilter("Rua Bom Pastor")
-                )
-        );
-        compositeFilterOr.forEach(System.out::println);
-        System.out.println("\nTotal encontrado: " + compositeFilterOr.size() + "\n");
-
-        // ========== DEMONSTRAÇÃO 9: Filtro + Ordenação Combinados ==========
-        System.out.println("════════════════════════════════════════════════════════════════");
-        System.out.println("FILTRO + ORDENAÇÃO - Faixa 8.500-10.000, Ordenado por Preço");
-        System.out.println("════════════════════════════════════════════════════════════════\n");
-        List<Property> filteredAndSorted = service.filterAndSort(
-                new PriceRangeFilter(8500, 10000),
-                new PriceSortStrategy(SortOrder.ASCENDING)
-        );
-        filteredAndSorted.stream().limit(10).forEach(System.out::println);
-        System.out.println("\nTotal encontrado: " + filteredAndSorted.size() + "\n");
-
-        // ========== CONCLUSÃO ==========
-        System.out.println("════════════════════════════════════════════════════════════════");
-        System.out.println("✅ Demonstração concluída com sucesso!");
-        System.out.println("════════════════════════════════════════════════════════════════");
-    }
-
-    /**
-     * Método auxiliar para executar cenário customizado.
-     *
-     * Pode ser chamado de testes ou outras classes para demonstrações específicas.
-     *
-     * @param propertyCount Número de propriedades a gerar
-     */
-    public static void runCustomScenario(int propertyCount) {
-        PropertyGenerator generator = new PropertyGenerator();
-        List<Property> properties = generator.generate(propertyCount);
-
-        PropertyRepository repository = new PropertyRepository(properties);
-        PropertyService service = new PropertyService(repository);
-
-        service.subscribe(new PriceChangeListener());
-
-        System.out.println("\n📌 Cenário Customizado com " + propertyCount + " propriedades\n");
-        System.out.println("Total de propriedades: " + service.getPropertyCount());
+        return records;
     }
 }
+
